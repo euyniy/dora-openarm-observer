@@ -90,6 +90,20 @@ def _build_output(observation, phase_classifier_result, task_prompt, metadata):
     return pa.StructArray.from_arrays(arrays, names)
 
 
+def _empty_observation(arms):
+    observation = {}
+    if "right" in arms:
+        observation["arm_right"] = None
+        observation["camera_wrist_right"] = None
+    if "left" in arms:
+        observation["arm_left"] = None
+        observation["camera_wrist_left"] = None
+    observation["camera_head_left"] = None
+    observation["camera_head_right"] = None
+    observation["camera_ceiling"] = None
+    return observation
+
+
 def main():
     """Collect the last observation."""
     parser = argparse.ArgumentParser(description="Collect the last observation")
@@ -102,16 +116,7 @@ def main():
     args = parser.parse_args()
     arms = args.arms.split(",")
     node = dora.Node()
-    observation = {}
-    if "right" in arms:
-        observation["arm_right"] = None
-        observation["camera_wrist_right"] = None
-    if "left" in arms:
-        observation["arm_left"] = None
-        observation["camera_wrist_left"] = None
-    observation["camera_head_left"] = None
-    observation["camera_head_right"] = None
-    observation["camera_ceiling"] = None
+    observation = _empty_observation(arms)
     episode_number = 0
     last_phase_classifier_result = None
     last_task_prompt = None   # None until UI explicitly sets one
@@ -128,10 +133,13 @@ def main():
             if any(v is None for v in observation.values()):
                 # If any observation isn't ready yet, we skip this tick.
                 continue
+            if last_task_prompt is None:
+                continue
             if (
                 ("right" in arms and last_arm_right_status == "stopped")
                 or ("left" in arms and last_arm_left_status == "stopped")
             ):
+                print("BLOCKING OBS")
                 continue
             metadata = {
                 "episode_number": episode_number,
@@ -151,6 +159,9 @@ def main():
             last_command = event["value"][0].as_py()
             if last_command == "start":
                 episode_number = event["metadata"].get("episode_number", 0)
+                observation = _empty_observation(arms)
+                last_phase_classifier_result = None
+                last_task_prompt = None
         elif event_id == "arm_right_status":
             last_arm_right_status = event["value"][0].as_py()
         elif event_id == "arm_left_status":
