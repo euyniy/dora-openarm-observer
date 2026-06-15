@@ -115,7 +115,6 @@ def main():
     episode_number = 0
     last_phase_classifier_result = None
     last_task_prompt = None
-    last_command = ""
     last_arm_right_status = None
     last_arm_left_status = None
     for event in node:
@@ -128,15 +127,13 @@ def main():
             if any(v is None for v in observation.values()):
                 # If any observation isn't ready yet, we skip this tick.
                 continue
-            if (
-                ("right" in arms and last_arm_right_status == "stopped")
-                or ("left" in arms and last_arm_left_status == "stopped")
+            if ("right" in arms and last_arm_right_status == "stopped") or (
+                "left" in arms and last_arm_left_status == "stopped"
             ):
                 continue
             metadata = {
                 "episode_number": episode_number,
                 "timestamp": time.time_ns(),
-                "command": last_command,
             }
             arrow_observation = _build_output(
                 observation, last_phase_classifier_result, last_task_prompt, metadata
@@ -148,8 +145,7 @@ def main():
                 metadata,
             )
         elif event_id == "command":
-            last_command = event["value"][0].as_py()
-            if last_command == "start":
+            if event["value"][0].as_py() == "start":
                 episode_number = event["metadata"].get("episode_number", 0)
         elif event_id == "arm_right_status":
             last_arm_right_status = event["value"][0].as_py()
